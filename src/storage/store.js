@@ -594,7 +594,7 @@ export const useMainStore = defineStore("useMainStore", {
         });
         await this.setLoc("states", records);
         this.states = await this.getLoc("states");
-        this.isLaoding = false;
+        // this.isLaoding = false;
         // await this.fetch("states").then(async (res) => {
         //   this.states = res.data.states;
         //   await this.setLoc("states", this.states);
@@ -644,7 +644,6 @@ export const useMainStore = defineStore("useMainStore", {
           .then(async (res) => {
             await this.setLoc("allFacilities", res.data.facilities);
             this.facilities = res.data.facilities;
-            this.isLaoding = false;
           });
       }
     },
@@ -742,7 +741,6 @@ export const useMainStore = defineStore("useMainStore", {
     },
 
     async fetchNationalMapData() {
-      this.isLaoding = true;
       let data = {
         state: ["Fct"],
         lga: ["Bwari"],
@@ -757,7 +755,6 @@ export const useMainStore = defineStore("useMainStore", {
         .then((res) => {
           this.mapNationalData[this.view] = null;
           this.mapNationalData[this.view] = res.data;
-          this.isLaoding = false;
         });
 
       // let url = `support_duration?`;
@@ -900,6 +897,7 @@ export const useMainStore = defineStore("useMainStore", {
     // },
 
     async launchAapp() {
+      this.isLaoding = true;
       await this.fetchStates();
       // await this.fetchLgas();
       await this.fetchPartners();
