@@ -5,8 +5,8 @@ import { marker, tooltip } from "leaflet";
 import { toRaw } from "vue";
 import * as localForage from "localforage";
 import PocketBase from "pocketbase";
-const pb = new PocketBase("https://pb-api.resourcetrackr.com");
-
+const pbUrl = "https://pb-api.resourcetrackr.com";
+const pb = new PocketBase(pbUrl);
 Chart.defaults.datasets.bar.maxBarThickness = 25;
 
 export const useMainStore = defineStore("useMainStore", {
@@ -617,36 +617,36 @@ export const useMainStore = defineStore("useMainStore", {
       }
     },
 
-    async fetchFacilities() {
-      // let st = this.selectedState[this.view];
-      // let localFcsName = `facilities${st}`;
-      // await this.delLoc(localFcsName);
-      // let localFcs = await this.getLoc(localFcsName);
+    // async fetchFacilities() {
+    //   // let st = this.selectedState[this.view];
+    //   // let localFcsName = `facilities${st}`;
+    //   // await this.delLoc(localFcsName);
+    //   // let localFcs = await this.getLoc(localFcsName);
 
-      // console.log(localFcs);
+    //   // console.log(localFcs);
 
-      let localFcs = await this.getLoc("allFacilities");
+    //   let localFcs = await this.getLoc("allFacilities");
 
-      if (localFcs) {
-        this.facilities = localFcs;
-      } else {
-        // let url = `dh_facilities?state=${st}`;
-        // await this.fetch(url).then(async (res) => {
-        //   this.facilities = res.data.facilities;
-        //   await this.setLoc(localFcsName, this.facilities);
-        //   this.isLaoding = false;
-        // });
-        // const records = await pb.collection("facility").getFullList({
-        //   fields: "facility,state,lga,geometry",
-        // });
-        await axios
-          .get("https://pb-api.resourcetrackr.com/api/facilities")
-          .then(async (res) => {
-            await this.setLoc("allFacilities", res.data.facilities);
-            this.facilities = res.data.facilities;
-          });
-      }
-    },
+    //   if (localFcs) {
+    //     this.facilities = localFcs;
+    //   } else {
+    //     // let url = `dh_facilities?state=${st}`;
+    //     // await this.fetch(url).then(async (res) => {
+    //     //   this.facilities = res.data.facilities;
+    //     //   await this.setLoc(localFcsName, this.facilities);
+    //     //   this.isLaoding = false;
+    //     // });
+    //     // const records = await pb.collection("facility").getFullList({
+    //     //   fields: "facility,state,lga,geometry",
+    //     // });
+    //     await axios
+    //       .get("https://pb-api.resourcetrackr.com/api/facilities")
+    //       .then(async (res) => {
+    //         await this.setLoc("allFacilities", res.data.facilities);
+    //         this.facilities = res.data.facilities;
+    //       });
+    //   }
+    // },
 
     // nownow
 
@@ -750,12 +750,10 @@ export const useMainStore = defineStore("useMainStore", {
         status: ["In Progress"],
       };
 
-      await axios
-        .post("https://pb-api.resourcetrackr.com/api/support", data)
-        .then((res) => {
-          this.mapNationalData[this.view] = null;
-          this.mapNationalData[this.view] = res.data;
-        });
+      await axios.post(`${pbUrl}/api/support`, data).then((res) => {
+        this.mapNationalData[this.view] = null;
+        this.mapNationalData[this.view] = res.data;
+      });
 
       // let url = `support_duration?`;
       // let partners_param = "&partners=";
@@ -904,7 +902,7 @@ export const useMainStore = defineStore("useMainStore", {
       await this.fetchPrograms();
       await this.fetchSupportTypes();
       await this.fetchNationalMapData();
-      await this.fetchFacilities();
+      // await this.fetchFacilities();
       this.loadNationalMapGeometry();
       await this.createNationalMap();
       // await this.loadGeoData();
@@ -1679,8 +1677,23 @@ export const useMainStore = defineStore("useMainStore", {
     //   );
     // },
 
-    onEachNationalMapFeature(feature, layer) {
-      this.isLaoding = true;
+    async getRandStateFacilities(state, limit) {
+      const recName = `${state}-${limit}`;
+      let fcs = await this.getLoc(recName);
+      if (fcs) {
+        return fcs;
+      } else {
+        await axios
+          .get(`${pbUrl}/api/rand/state/facilities/${state}/${limit}`)
+          .then(async (r) => {
+            await this.setLoc(recName, r.data);
+          });
+        fcs = await this.getLoc(recName);
+        return fcs;
+      }
+    },
+
+    async onEachNationalMapFeature(feature, layer) {
       layer.on({
         mouseover: this.highlightNationalMapFeature,
         mouseout: this.resetMapHighlight,
@@ -1707,7 +1720,11 @@ export const useMainStore = defineStore("useMainStore", {
       this.natonalMapMarkers.addTo(this.map);
 
       let st = feature.properties.state;
-      let lgaFclts = this.facilities.filter((fc) => fc.state === st);
+      // let lgaFclts = this.facilities.filter((fc) => fc.state === st);
+      let lgaFclts = await this.getRandStateFacilities(
+        st,
+        this.mapNationalData[this.view].length
+      );
 
       for (
         let stIdx = 0;
@@ -1715,6 +1732,7 @@ export const useMainStore = defineStore("useMainStore", {
         stIdx++
       ) {
         const mpData = this.mapNationalData[this.view][stIdx];
+
         if (mpData.States_supported.some((stateObj) => stateObj.state === st)) {
           let randomIndex = Math.floor(Math.random() * lgaFclts.length);
           let randFacility = lgaFclts[randomIndex];
@@ -1733,7 +1751,7 @@ export const useMainStore = defineStore("useMainStore", {
               };
             }
           });
-          console.log(mpData.Status_of_support);
+
           if (mpData.Status_of_support == "In Progress") {
             mhtml = `
             <div class="shadow-sm w-3 h-3 rounded-full" style="background: yellow;"></div>
@@ -1869,6 +1887,8 @@ export const useMainStore = defineStore("useMainStore", {
       this.fitBounds(this.geoJson);
       this.map.setMaxBounds(this.geoJson.getBounds());
     },
+
+    // ---------
 
     async createMap() {
       var mapContainerParent = this.mapContainerRef.parentNode;
